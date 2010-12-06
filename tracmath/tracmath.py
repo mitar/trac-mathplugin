@@ -5,7 +5,6 @@ This has currently been tested only on trac 0.10.4 and 0.11.
 
 import codecs
 import re
-import sha
 from cStringIO import StringIO
 import os
 import sys
@@ -133,6 +132,7 @@ class TracMathPlugin(Component):
             """
 
     def internal_render(self, req, name, content):
+        from hashlib import sha1
         if not name == 'latex':
             return 'Unknown macro %s' % (name)
 
@@ -142,7 +142,7 @@ class TracMathPlugin(Component):
             if m:
                 label = m.group(1)
 
-        key = sha.new(content.encode('utf-8')).hexdigest()
+        key = sha1(content.encode('utf-8')).hexdigest()
 
         imgname = key + '.png'
         imgpath = os.path.join(self.cacheDirectory, imgname)
