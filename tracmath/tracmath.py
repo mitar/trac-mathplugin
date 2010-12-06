@@ -104,7 +104,7 @@ class TracMathPlugin(Component):
             pieces = [item for item in pieces[0].split('/') if item]
             if pieces:
                 name = pieces[0]
-                img_path = os.path.join(self.cacheDirectory, name)
+                img_path = os.path.join(self.cache_dir, name)
                 return req.send_file(img_path,
                         mimeview.get_mimetype(img_path))
         return
@@ -124,12 +124,12 @@ class TracMathPlugin(Component):
         key = sha1(content.encode('utf-8')).hexdigest()
 
         imgname = key + '.png'
-        imgpath = os.path.join(self.cacheDirectory, imgname)
+        imgpath = os.path.join(self.cache_dir, imgname)
 
         if not os.path.exists(imgpath):
 
             texname = key + '.tex'
-            texpath = os.path.join(self.cacheDirectory, texname)
+            texpath = os.path.join(self.cache_dir, texname)
 
             try:
                 f = codecs.open(texpath, encoding='utf-8', mode='w')
@@ -140,7 +140,7 @@ class TracMathPlugin(Component):
             except Exception, e:
                 return self.show_err("Problem creating tex file: %s" % (e))
 
-            os.chdir(self.cacheDirectory)
+            os.chdir(self.cache_dir)
             cmd = self.latex_cmd + ' %s' % texname
             pin, pout, perr = os.popen3(cmd)
             pin.close()
@@ -172,14 +172,14 @@ class TracMathPlugin(Component):
 
         ftime = []
 
-        for name in os.listdir(self.cacheDirectory):
+        for name in os.listdir(self.cache_dir):
 
             for ext in reGARBAGE:
                 if ext.match(name):
-                    os.unlink(os.path.join(self.cacheDirectory, name))
+                    os.unlink(os.path.join(self.cache_dir, name))
 
             if rePNG.match(name):
-                info = os.stat(os.path.join(self.cacheDirectory, name))
+                info = os.stat(os.path.join(self.cache_dir, name))
                 ftime.append((info[7], name))
 
         ftime.sort(reverse=True)
@@ -189,7 +189,7 @@ class TracMathPlugin(Component):
 
         while numfiles > self.max_png:
             name = files.next()
-            os.unlink(os.path.join(self.cacheDirectory, name))
+            os.unlink(os.path.join(self.cache_dir, name))
             numfiles -= 1
 
     def _load_config(self):
@@ -205,7 +205,7 @@ class TracMathPlugin(Component):
         if 'tracmath' not in self.config.sections():
             pass    # TODO: do something
 
-        self.cacheDirectory = self.config.get('tracmath', 'cache_dir') or tmp
+        self.cache_dir = self.config.get('tracmath', 'cache_dir') or tmp
         self.latex_cmd = self.config.get('tracmath', 'latex_cmd') or latex
         self.dvipng_cmd = self.config.get('tracmath', 'dvipng_cmd') or dvipng
         self.max_png = self.config.get('tracmath', 'max_png') or max_png
@@ -214,8 +214,8 @@ class TracMathPlugin(Component):
         self.use_dollars = self.use_dollars.lower() in ("true", "on", "enabled")
         self.mag_factor = self.config.get('tracmath', 'mag_factor') or mag_factor
 
-        if not os.path.exists(self.cacheDirectory):
-            os.mkdir(self.cacheDirectory, 0777)
+        if not os.path.exists(self.cache_dir):
+            os.mkdir(self.cache_dir, 0777)
 
         #TODO: check correct values.
         return ''
