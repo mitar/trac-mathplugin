@@ -7,17 +7,13 @@ import codecs
 import re
 from cStringIO import StringIO
 import os
-import sys
 
-from genshi.builder import tag
-
-from trac.core import *
+from trac.core import Component, implements
 from trac.wiki.api import IWikiMacroProvider
 from trac.wiki.api import IWikiSyntaxProvider
-from trac.mimeview.api import IHTMLPreviewRenderer, MIME_MAP
+from trac.mimeview.api import IHTMLPreviewRenderer
 from trac.web import IRequestHandler
 from trac.util import escape
-from trac.wiki.formatter import wiki_to_oneliner
 from trac import mimeview
 
 __author__ = 'Reza Lotun'
@@ -86,15 +82,6 @@ class TracMathPlugin(Component):
                    </div></div>' % escape(msg))
         self.log.error(msg)
         return buf
-
-    # IWikiSyntaxProvider methods
-    def get_wiki_syntax(self):
-        def format(formatter, ns, match):
-            return self.internal_render(formatter.req,'latex',match.group(0))
-        yield (r"\$[^$]+\$", format)
-
-    def get_link_resolvers(self):
-        return []
 
     # IWikiSyntaxProvider methods
     #   stolen from http://trac-hacks.org/ticket/248
@@ -231,7 +218,7 @@ class TracMathPlugin(Component):
 
     def render(self, req, mimetype, content, filename=None, url=None):
         text = hasattr(content, 'read') and content.read() or content
-        return self.internal_render(req, name, text)
+        return self.internal_render(req, 'latex', text)
 
     # IRequestHandler methods
     def match_request(self, req):
