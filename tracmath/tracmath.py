@@ -42,46 +42,7 @@ class TracMathPlugin(Component):
     implements(IWikiMacroProvider, IHTMLPreviewRenderer, IRequestHandler, IWikiSyntaxProvider)
 
     def __init__(self):
-        self.load_config()
-
-    def load_config(self):
-        """Load the tracmath trac.ini configuration."""
-
-        # defaults
-        tmp = '/tmp/tracmath'
-        latex = '/usr/bin/latex'
-        dvipng = '/usr/bin/dvipng'
-        max_png = 500
-        mag_factor = 1200
-
-        if 'tracmath' not in self.config.sections():
-            pass    # TODO: do something
-
-        self.cacheDirectory = self.config.get('tracmath', 'cache_dir') or tmp
-        self.latex_cmd = self.config.get('tracmath', 'latex_cmd') or latex
-        self.dvipng_cmd = self.config.get('tracmath', 'dvipng_cmd') or dvipng
-        self.max_png = self.config.get('tracmath', 'max_png') or max_png
-        self.max_png = int(self.max_png)
-        self.use_dollars = self.config.get('tracmath', 'use_dollars') or "False"
-        self.use_dollars = self.use_dollars.lower() in ("true", "on", "enabled")
-        self.mag_factor = self.config.get('tracmath', 'mag_factor') or mag_factor
-
-        if not os.path.exists(self.cacheDirectory):
-            os.mkdir(self.cacheDirectory, 0777)
-
-        #TODO: check correct values.
-        return ''
-
-    def show_err(self, msg):
-        """Display msg in an error box, using Trac style."""
-        buf = StringIO()
-        buf.write('<div id="content" class="error"><div class="message"> \n\
-                   <strong>TracMath macro processor has detected an \n\
-                   error. Please fix the problem before continuing. \n\
-                   </strong> <pre>%s</pre> \n\
-                   </div></div>' % escape(msg))
-        self.log.error(msg)
-        return buf
+        self._load_config()
 
     # IWikiSyntaxProvider methods
     #   stolen from http://trac-hacks.org/ticket/248
@@ -119,8 +80,37 @@ class TracMathPlugin(Component):
             `$[latex formula]$` for inline math or `$$[latex formula]$$` for
             display math.
             """
+    def expand_macro(self, formatter, name, content):
+        return self._internal_render(formatter.req, name, content)
 
-    def internal_render(self, req, name, content):
+    # IHTMLPreviewRenderer methods
+    def get_quality_ratio(self, mimetype):
+        if mimetype in ('application/tracmath'):
+            return 2
+        return 0
+
+    def render(self, req, mimetype, content, filename=None, url=None):
+        text = hasattr(content, 'read') and content.read() or content
+        return self._internal_render(req, 'latex', text)
+
+    # IRequestHandler methods
+    def match_request(self, req):
+        return req.path_info.startswith('/tracmath')
+
+    def process_request(self, req):
+        pieces = [item for item in req.path_info.split('/tracmath') if item]
+
+        if pieces:
+            pieces = [item for item in pieces[0].split('/') if item]
+            if pieces:
+                name = pieces[0]
+                img_path = os.path.join(self.cacheDirectory, name)
+                return req.send_file(img_path,
+                        mimeview.get_mimetype(img_path))
+        return
+
+    # Internal implementation
+    def _internal_render(self, req, name, content):
         from hashlib import sha1
         if not name == 'latex':
             return 'Unknown macro %s' % (name)
@@ -171,14 +161,14 @@ class TracMathPlugin(Component):
             if len(err) and len(out):
                 pass # TODO: check for real errors
 
-            self.manage_cache()
+            self._manage_cache()
 
         result = '<img src="%s/tracmath/%s" alt="%s" />' % (req.base_url, imgname, content)
         if label:
             result = '<a name="%s">(%s)<a/>&nbsp;%s' % (label, label, result)
         return result
 
-    def manage_cache(self):
+    def _manage_cache(self):
 
         ftime = []
 
@@ -202,37 +192,41 @@ class TracMathPlugin(Component):
             os.unlink(os.path.join(self.cacheDirectory, name))
             numfiles -= 1
 
+    def _load_config(self):
+        """Load the tracmath trac.ini configuration."""
 
-    def expand_macro(self, formatter, name, content):
-        return self.internal_render(formatter.req, name, content)
+        # defaults
+        tmp = '/tmp/tracmath'
+        latex = '/usr/bin/latex'
+        dvipng = '/usr/bin/dvipng'
+        max_png = 500
+        mag_factor = 1200
 
-    # needed for Trac 0.10.4
-    def render_macro(self, req, name, content):
-        return self.internal_render(req, name, content)
+        if 'tracmath' not in self.config.sections():
+            pass    # TODO: do something
 
-    # IHTMLPreviewRenderer methods
-    def get_quality_ratio(self, mimetype):
-        if mimetype in ('application/tracmath'):
-            return 2
-        return 0
+        self.cacheDirectory = self.config.get('tracmath', 'cache_dir') or tmp
+        self.latex_cmd = self.config.get('tracmath', 'latex_cmd') or latex
+        self.dvipng_cmd = self.config.get('tracmath', 'dvipng_cmd') or dvipng
+        self.max_png = self.config.get('tracmath', 'max_png') or max_png
+        self.max_png = int(self.max_png)
+        self.use_dollars = self.config.get('tracmath', 'use_dollars') or "False"
+        self.use_dollars = self.use_dollars.lower() in ("true", "on", "enabled")
+        self.mag_factor = self.config.get('tracmath', 'mag_factor') or mag_factor
 
-    def render(self, req, mimetype, content, filename=None, url=None):
-        text = hasattr(content, 'read') and content.read() or content
-        return self.internal_render(req, 'latex', text)
+        if not os.path.exists(self.cacheDirectory):
+            os.mkdir(self.cacheDirectory, 0777)
 
-    # IRequestHandler methods
-    def match_request(self, req):
-        return req.path_info.startswith('/tracmath')
+        #TODO: check correct values.
+        return ''
 
-    def process_request(self, req):
-        pieces = [item for item in req.path_info.split('/tracmath') if item]
-
-        if pieces:
-            pieces = [item for item in pieces[0].split('/') if item]
-            if pieces:
-                name = pieces[0]
-                img_path = os.path.join(self.cacheDirectory, name)
-                return req.send_file(img_path,
-                        mimeview.get_mimetype(img_path))
-        return
-
+    def _show_err(self, msg):
+        """Display msg in an error box, using Trac style."""
+        buf = StringIO()
+        buf.write('<div id="content" class="error"><div class="message"> \n\
+                   <strong>TracMath macro processor has detected an \n\
+                   error. Please fix the problem before continuing. \n\
+                   </strong> <pre>%s</pre> \n\
+                   </div></div>' % escape(msg))
+        self.log.error(msg)
+        return buf
