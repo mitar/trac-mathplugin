@@ -49,10 +49,14 @@ class TracMathPlugin(Component):
 
     def get_wiki_syntax(self):
         if self.use_dollars:
-            yield (r"\$\$(?P<displaymath>.*?)\$\$",
-                   lambda formatter, ns, match: "<blockquote>" + self.expand_macro(formatter, 'latex', ns) + "</blockquote>")
-            yield (r"\$(?P<latex>.*?)\$",
-                   lambda formatter, ns, match: self.expand_macro(formatter, 'latex', ns))
+            yield (r"\$\$(?P<displaymath>.*?)\$\$", self._format_math_block)
+            yield (r"\$(?P<latex>.*?)\$", self._format_math_inline)
+
+    def _format_math_block(self, formatter, ns, match):
+        return "<blockquote>" + self.expand_macro(formatter, 'latex', ns) + "</blockquote>"
+
+    def _format_math_inline(self, formatter, ns, match):
+        return self.expand_macro(formatter, 'latex', ns)
 
     def get_link_resolvers(self):
         return []
