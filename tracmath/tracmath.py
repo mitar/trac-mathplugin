@@ -56,6 +56,7 @@ class TracMathPlugin(Component):
         latex = '/usr/bin/latex'
         dvipng = '/usr/bin/dvipng'
         max_png = 500
+        mag_factor = 1200
 
         if 'tracmath' not in self.config.sections():
             pass    # TODO: do something
@@ -67,6 +68,7 @@ class TracMathPlugin(Component):
         self.max_png = int(self.max_png)
         self.use_dollars = self.config.get('tracmath', 'use_dollars') or "False"
         self.use_dollars = self.use_dollars.lower() in ("true", "on", "enabled")
+        self.mag_factor = self.config.get('tracmath', 'mag_factor') or mag_factor
 
         if not os.path.exists(self.cacheDirectory):
             os.mkdir(self.cacheDirectory, 0777)
@@ -172,7 +174,7 @@ class TracMathPlugin(Component):
                 return 'Unable to call: %s %s %s' % (cmd, out, err)
 
             cmd = "".join([self.dvipng_cmd,
-                    " -T tight -x 1200 -z 9 -bg Transparent ",
+                    " -T tight -x %s -z 9 -bg Transparent " % self.mag_factor,
                     "-o %s %s" % (imgname, key + '.dvi')])
             pin, pout, perr = os.popen3(cmd)
             pin.close()
