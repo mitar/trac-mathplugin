@@ -6,7 +6,7 @@ This has currently been tested only on trac 0.10.4 and 0.11.
 import codecs
 import re
 from cStringIO import StringIO
-import os
+import os.path
 
 from trac.core import Component, implements
 from trac.wiki.api import IWikiMacroProvider
@@ -116,6 +116,9 @@ class TracMathPlugin(Component):
     # Internal implementation
     def _internal_render(self, req, name, content):
         from hashlib import sha1
+        from subprocess import Popen, PIPE
+        import shlex
+
         if not name == 'latex':
             return 'Unknown macro %s' % (name)
 
@@ -145,11 +148,9 @@ class TracMathPlugin(Component):
                 return self.show_err("Problem creating tex file: %s" % (e))
 
             os.chdir(self.cache_dir)
-            cmd = self.latex_cmd + ' %s' % texname
-            pin, pout, perr = os.popen3(cmd)
-            pin.close()
-            out = pout.read()
-            err = perr.read()
+            latex_proc = Popen(shlex.split("%s %s" % (self.latex_cmd, texname)),
+                               stdout=PIPE, stderr=PIPE)
+            (out, err) = latex_proc.communicate()
 
             if len(err) and len(out):
                 return 'Unable to call: %s %s %s' % (cmd, out, err)
@@ -157,10 +158,8 @@ class TracMathPlugin(Component):
             cmd = "".join([self.dvipng_cmd,
                     " -T tight -x %s -z 9 -bg Transparent " % self.mag_factor,
                     "-o %s %s" % (imgname, key + '.dvi')])
-            pin, pout, perr = os.popen3(cmd)
-            pin.close()
-            out = pout.read()
-            err = perr.read()
+            dvipng_proc = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
+            (out, err) = dvipng_proc.communicate()
 
             if len(err) and len(out):
                 pass # TODO: check for real errors
