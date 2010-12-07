@@ -6,6 +6,7 @@ This has currently been tested only on trac 0.10.4 and 0.11.
 import codecs
 import re
 from cStringIO import StringIO
+import os
 import os.path
 
 from trac.core import Component, implements
@@ -165,6 +166,9 @@ class TracMathPlugin(Component):
                 pass # TODO: check for real errors
 
             self._manage_cache()
+        else:
+            # Touch the file to keep it live in the cache
+            os.utime(imgpath, None)
 
         result = '<img src="%s/tracmath/%s" alt="%s" />' % (req.base_url, imgname, content)
         if label:
@@ -172,28 +176,21 @@ class TracMathPlugin(Component):
         return result
 
     def _manage_cache(self):
-
-        ftime = []
-
+        png_files = []
         for name in os.listdir(self.cache_dir):
-
             for ext in reGARBAGE:
                 if ext.match(name):
                     os.unlink(os.path.join(self.cache_dir, name))
+            if name.endswith('.png'):
+                png_files.append(name)
 
-            if rePNG.match(name):
-                info = os.stat(os.path.join(self.cache_dir, name))
-                ftime.append((info[7], name))
-
-        ftime.sort(reverse=True)
-
-        numfiles = len(ftime)
-        files = (name for _, name in ftime)
-
-        while numfiles > self.max_png:
-            name = files.next()
-            os.unlink(os.path.join(self.cache_dir, name))
-            numfiles -= 1
+        if len(png_files) > self.max_png:
+            stats = sorted((os.stat(os.path.join(self.cache_dir, name)).st_mtime, name) 
+                           for name in png_files)
+            # We don't delete the last max_png elements, so remove them from the list
+            del stats[-self.max_png:]
+            for stat in stats:
+                os.unlink(os.path.join(self.cache_dir, stat[1]))
 
     def _load_config(self):
         """Load the tracmath trac.ini configuration."""
