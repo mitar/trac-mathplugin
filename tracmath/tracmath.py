@@ -149,12 +149,12 @@ class TracMathPlugin(Component):
                 return self.show_err("Problem creating tex file: %s" % (e))
 
             os.chdir(self.cache_dir)
-            latex_proc = Popen(shlex.split("%s %s" % (self.latex_cmd, texname)),
-                               stdout=PIPE, stderr=PIPE)
+            cmd = "%s %s" % (self.latex_cmd, texname)
+            latex_proc = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
             (out, err) = latex_proc.communicate()
 
             if len(err) and len(out):
-                return 'Unable to call: %s %s %s' % (cmd, out, err)
+                return self.show_err('Unable to call: %s %s %s' % (cmd, out, err))
 
             cmd = "".join([self.dvipng_cmd,
                     " -T tight -x %s -z 9 -bg Transparent " % self.mag_factor,
