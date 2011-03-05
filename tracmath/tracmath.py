@@ -146,7 +146,7 @@ class TracMathPlugin(Component):
                 f.write('\end{document}')
                 f.close()
             except Exception, e:
-                return self.show_err("Problem creating tex file: %s" % (e))
+                return self._show_err("Problem creating tex file: %s" % (e))
 
             os.chdir(self.cache_dir)
             cmd = "%s %s" % (self.latex_cmd, texname)
@@ -154,7 +154,7 @@ class TracMathPlugin(Component):
             (out, err) = latex_proc.communicate()
 
             if len(err) and len(out):
-                return self.show_err('Unable to call: %s %s %s' % (cmd, out, err))
+                return self._show_err('Unable to call: %s %s %s' % (cmd, out, err))
 
             cmd = "".join([self.dvipng_cmd,
                     " -T tight -x %s -z 9 -bg Transparent " % self.mag_factor,
@@ -163,7 +163,7 @@ class TracMathPlugin(Component):
             (out, err) = dvipng_proc.communicate()
 
             if len(err) and len(out):
-                pass # TODO: check for real errors
+                return self._show_err('Unable to call: %s %s %s' % (cmd, out, err))
 
             self._manage_cache()
         else:
