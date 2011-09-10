@@ -149,7 +149,8 @@ class TracMathPlugin(Component):
                 return self.show_err("Problem creating tex file: %s" % (e))
 
             os.chdir(self.cache_dir)
-            cmd = "%s %s" % (self.latex_cmd, texname)
+            cmd = "%s -interaction nonstopmode %s" % (self.latex_cmd, texname)
+            self.log.debug("Running latex command: " + cmd)
             latex_proc = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
             (out, err) = latex_proc.communicate()
 
@@ -159,6 +160,7 @@ class TracMathPlugin(Component):
             cmd = "".join([self.dvipng_cmd,
                     " -T tight -x %s -z 9 -bg Transparent " % self.mag_factor,
                     "-o %s %s" % (imgname, key + '.dvi')])
+            self.log.debug("Running dvipng command: " + cmd)
             dvipng_proc = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
             (out, err) = dvipng_proc.communicate()
 
@@ -203,7 +205,7 @@ class TracMathPlugin(Component):
         mag_factor = 1200
 
         if 'tracmath' not in self.config.sections():
-            pass    # TODO: do something
+            self.log.warn("The [tracmath] section is not configured in trac.ini. Using defaults.")
 
         self.cache_dir = self.config.get('tracmath', 'cache_dir') or tmp
         self.latex_cmd = self.config.get('tracmath', 'latex_cmd') or latex
@@ -214,6 +216,10 @@ class TracMathPlugin(Component):
         self.use_dollars = self.use_dollars.lower() in ("true", "on", "enabled")
         self.mag_factor = self.config.get('tracmath', 'mag_factor') or mag_factor
 
+        if not os.path.exists(self.latex_cmd):
+            self.log.error('Could not find latex binary at ' + self.latex_cmd)
+        if not os.path.exists(self.dvipng_cmd):
+            self.log.error('Could not find dvipng binary at ' + self.dvipng_cmd)
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir, 0777)
 
