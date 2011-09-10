@@ -149,7 +149,7 @@ class TracMathPlugin(Component):
                 return self.show_err("Problem creating tex file: %s" % (e))
 
             os.chdir(self.cache_dir)
-            cmd = "%s -interaction nonstopmode %s" % (self.latex_cmd, texname)
+            cmd = str("%s -interaction nonstopmode %s" % (self.latex_cmd, texname))
             self.log.debug("Running latex command: " + cmd)
             latex_proc = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
             (out, err) = latex_proc.communicate()
@@ -157,9 +157,10 @@ class TracMathPlugin(Component):
             if len(err) and len(out):
                 return self.show_err('Unable to call: %s %s %s' % (cmd, out, err))
 
-            cmd = "".join([self.dvipng_cmd,
-                    " -T tight -x %s -z 9 -bg Transparent " % self.mag_factor,
-                    "-o %s %s" % (imgname, key + '.dvi')])
+            cmd = str("".join([self.dvipng_cmd,
+                               " -T tight -z %s " % self.compression,
+                               "-x %s -bg Transparent " % self.mag_factor,
+                               "-o %s %s" % (imgname, key + '.dvi')]))
             self.log.debug("Running dvipng command: " + cmd)
             dvipng_proc = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
             (out, err) = dvipng_proc.communicate()
@@ -203,6 +204,7 @@ class TracMathPlugin(Component):
         dvipng = '/usr/bin/dvipng'
         max_png = 500
         mag_factor = 1200
+        compression = 6
 
         if 'tracmath' not in self.config.sections():
             self.log.warn("The [tracmath] section is not configured in trac.ini. Using defaults.")
@@ -215,6 +217,7 @@ class TracMathPlugin(Component):
         self.use_dollars = self.config.get('tracmath', 'use_dollars') or "False"
         self.use_dollars = self.use_dollars.lower() in ("true", "on", "enabled")
         self.mag_factor = self.config.get('tracmath', 'mag_factor') or mag_factor
+        self.compression = self.config.get('tracmath', 'compression') or compression
 
         if not os.path.exists(self.latex_cmd):
             self.log.error('Could not find latex binary at ' + self.latex_cmd)
