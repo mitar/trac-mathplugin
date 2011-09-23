@@ -233,11 +233,7 @@ class TracMathPlugin(Component):
 
     def _show_err(self, msg):
         """Display msg in an error box, using Trac style."""
-        buf = StringIO()
-        buf.write('<div id="content" class="error"><div class="message"> \n\
-                   <strong>TracMath macro processor has detected an \n\
-                   error. Please fix the problem before continuing. \n\
-                   </strong> <pre>%s</pre> \n\
-                   </div></div>' % escape(msg))
         self.log.error(msg)
-        return buf
+        return '<div class="system-message"><div class="message"> \
+               <strong>TracMath macro processor has detected an error.</strong><pre>%s</pre> \
+               </div></div>' % (escape(msg),)
