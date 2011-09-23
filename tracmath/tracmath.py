@@ -199,7 +199,7 @@ class TracMathPlugin(Component):
         """Load the tracmath trac.ini configuration."""
 
         # defaults
-        tmp = '/tmp/tracmath'
+        tmp = 'tmcache'
         latex = '/usr/bin/latex'
         dvipng = '/usr/bin/dvipng'
         max_png = 500
@@ -223,8 +223,10 @@ class TracMathPlugin(Component):
             self.log.error('Could not find latex binary at ' + self.latex_cmd)
         if not os.path.exists(self.dvipng_cmd):
             self.log.error('Could not find dvipng binary at ' + self.dvipng_cmd)
+        if not os.path.isabs(self.cache_dir):
+            self.cache_dir = os.path.join(self.env.path, self.cache_dir)
         if not os.path.exists(self.cache_dir):
-            os.mkdir(self.cache_dir, 0777)
+            os.mkdir(self.cache_dir, 0755)
 
         #TODO: check correct values.
         return ''
