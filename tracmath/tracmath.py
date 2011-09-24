@@ -207,7 +207,7 @@ class TracMathPlugin(Component):
             # Touch the file to keep it live in the cache
             os.utime(imgpath, None)
 
-        result = '<img src="%s/tracmath/%s" alt="%s" />' % (req.base_url, imgname, content)
+        result = '<img src="%s" alt="%s" />' % (req.href("tracmath", imgname), content)
         if label:
             result = '<a name="%s">(%s)<a/>&nbsp;%s' % (label, label, result)
         return result
