@@ -30,6 +30,7 @@ reGARBAGE = [
              re.compile(r'\.log$'),
              re.compile(r'\.tex$'),
              re.compile(r'\.dvi$'),
+             re.compile(r'\.pdf$'),
             ]
 reLABEL = re.compile(r'\\label\{(.*?)\}')
 
@@ -73,17 +74,14 @@ class TracMathPlugin(Component):
             """The maximum number of files that the cache should
             contain.""")
     
-    mag_factor = IntOption("tracmath", "mag_factor", 1100,
-            """dvipng magnification factor.""")
+    png_resolution = Option("tracmath", "png_resolution", "110",
+            """PNG resolution when rendering.""")
     
-    compression = IntOption("tracmath", "compression", 6,
-            """PNG compression level.""")
+    pdflatex_cmd = Option("tracmath", "pdflatex_cmd", "/usr/bin/pdflatex",
+            """Full path to the pdflatex program (including the filename).""")
     
-    latex_cmd = Option("tracmath", "latex_cmd", "/usr/bin/latex",
-            """Full path to the latex program (including the filename).""")
-    
-    dvipng_cmd = Option("tracmath", "dvipng_cmd", "/usr/bin/dvipng",
-            """Full path to the dvipng program (including the filename).""")
+    gs_cmd = Option("tracmath", "gs_cmd", "/usr/bin/gs",
+            """Full path to the gs program (including the filename).""")
     
     use_dollars = BoolOption("tracmath", "use_dollars", False,
             """Should support for dollar wiki syntax be enabled.""")
@@ -185,7 +183,9 @@ class TracMathPlugin(Component):
             if m:
                 label = m.group(1)
 
-        key = sha1(content.encode('utf-8') + self.template_digest).hexdigest()
+        content = content.strip()
+
+        key = sha1(content.encode('utf-8') + self.template_digest + str(self.png_resolution)).hexdigest()
 
         imgname = key + '.png'
         imgpath = os.path.join(self.cache_dir, imgname)
@@ -212,7 +212,7 @@ class TracMathPlugin(Component):
 
             os.chdir(self.cache_dir)
             args = [
-                self.latex_cmd,
+                self.pdflatex_cmd,
                 "-interaction=nonstopmode",
                 texname,
             ]
@@ -222,13 +222,16 @@ class TracMathPlugin(Component):
                 return self._show_err(errmsg)
 
             args = [
-                self.dvipng_cmd,
-                "-T", "tight",
-                "-z", str(self.compression),
-                "-x", str(self.mag_factor),
-                "-bg","Transparent",
-                "-o", imgname,
-                "%s.dvi" % key,
+                self.gs_cmd,
+                '-dSAFER',
+                '-dBATCH',
+                '-dNOPAUSE',
+                '-r%s' % self.png_resolution,
+                '-sDEVICE=pngalpha',
+                '-dGraphicsAlphaBits=4',
+                '-dTextAlphaBits=4',
+                '-sOutputFile=%s' % imgname,
+                '%s.pdf' % key,
             ]
             self.log.debug("Running command: %s", " ".join(args))
             failure, errmsg = self._launch("", *args)
@@ -275,11 +278,11 @@ class TracMathPlugin(Component):
         if not os.path.exists(self.cache_dir):
             os.mkdir(self.cache_dir)
 
-        if not os.path.exists(self.latex_cmd):
-            return _("Could not find latex binary at %(cmd)s", cmd=self.latex_cmd)
+        if not os.path.exists(self.pdflatex_cmd):
+            return _("Could not find pdflatex binary at %(cmd)s", cmd=self.pdflatex_cmd)
 
-        if not os.path.exists(self.dvipng_cmd):
-            return _("Could not find dvipng binary at %(cmd)s", cmd=self.dvipng_cmd)
+        if not os.path.exists(self.gs_cmd):
+            return _("Could not find gs binary at %(cmd)s", cmd=self.gs_cmd)
 
     def _launch(self, encoded_input, *args):
         """Launch a process (cmd), and returns exitcode, stdout + stderr"""
