@@ -186,6 +186,9 @@ class TracMathPlugin(Component):
             if m:
                 label = m.group(1)
 
+        # We have to remove unnecessary ending lines because it seems otherwise preview LaTeX package
+        # improperly crops the PDF -- if there is an empty line bettween the end of the content
+        # and \end{preview}
         content = content.strip()
 
         key = sha1(content.encode('utf-8') + self.template_digest + str(self.png_resolution)).hexdigest()
