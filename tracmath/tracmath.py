@@ -5,6 +5,8 @@ import codecs
 import re
 import os
 import os.path
+from hashlib import sha1
+import subprocess
 
 from genshi.builder import tag
 
@@ -112,7 +114,7 @@ class TracMathPlugin(Component):
     def expand_macro(self, formatter, name, content):
         errmsg = self._load_config()
         if errmsg:
-            return self._error_div(errmsg)
+            return self._show_err(errmsg)
 
         return self._internal_render(formatter.req, name, content)
 
@@ -133,7 +135,7 @@ class TracMathPlugin(Component):
     def process_request(self, req):
         errmsg = self._load_config()
         if errmsg:
-            return self._error_div(errmsg)
+            return self._show_err(errmsg)
 
         pieces = [item for item in req.path_info.split('/tracmath') if item]
 
@@ -148,10 +150,6 @@ class TracMathPlugin(Component):
 
     # Internal implementation
     def _internal_render(self, req, name, content):
-        from hashlib import sha1
-        from subprocess import Popen, PIPE
-        import shlex
-
         if not name == 'latex':
             return 'Unknown macro %s' % (name)
 
@@ -167,7 +165,6 @@ class TracMathPlugin(Component):
         imgpath = os.path.join(self.cache_dir, imgname)
 
         if not os.path.exists(imgpath):
-
             texname = key + '.tex'
             texpath = os.path.join(self.cache_dir, texname)
 
@@ -181,24 +178,29 @@ class TracMathPlugin(Component):
                 return self._show_err("Problem creating tex file: %s" % (e))
 
             os.chdir(self.cache_dir)
-            cmd = str("%s -interaction nonstopmode %s" % (self.latex_cmd, texname))
-            self.log.debug("Running latex command: " + cmd)
-            latex_proc = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
-            (out, err) = latex_proc.communicate()
+            args = [
+                self.latex_cmd,
+                "-interaction=nonstopmode",
+                texname,
+            ]
+            self.log.debug("Running command: %s", " ".join(args))
+            failure, errmsg = self._launch("", *args)
+            if failure:
+                return self._show_err(errmsg)
 
-            if len(err) and len(out):
-                return self._show_err('Unable to call: %s\n%s%s' % (cmd, out, err))
-
-            cmd = str("".join([self.dvipng_cmd,
-                               " -T tight -z %s " % self.compression,
-                               "-x %s -bg Transparent " % self.mag_factor,
-                               "-o %s %s" % (imgname, key + '.dvi')]))
-            self.log.debug("Running dvipng command: " + cmd)
-            dvipng_proc = Popen(shlex.split(cmd), stdout=PIPE, stderr=PIPE)
-            (out, err) = dvipng_proc.communicate()
-
-            if len(err) and len(out):
-                return self._show_err('Unable to call: %s\n%s%s' % (cmd, out, err))
+            args = [
+                self.dvipng_cmd,
+                "-T", "tight",
+                "-z", str(self.compression),
+                "-x", str(self.mag_factor),
+                "-bg","Transparent",
+                "-o", imgname,
+                "%s.dvi" % key,
+            ]
+            self.log.debug("Running command: %s", " ".join(args))
+            failure, errmsg = self._launch("", *args)
+            if failure:
+                return self._show_err(errmsg)
 
             self._manage_cache()
         else:
@@ -245,6 +247,34 @@ class TracMathPlugin(Component):
 
         if not os.path.exists(self.dvipng_cmd):
             return _("Could not find dvipng binary at %(cmd)s", cmd=self.dvipng_cmd)
+
+    def _launch(self, encoded_input, *args):
+        """Launch a process (cmd), and returns exitcode, stdout + stderr"""
+        # Note: subprocess.Popen doesn't support unicode options arguments
+        # (http://bugs.python.org/issue1759845) so we have to encode them.
+        # Anyway, dot expects utf-8 or the encoding specified with -Gcharset.
+        encoded_cmd = []
+        for arg in args:
+            if isinstance(arg, unicode):
+                arg = arg.encode('utf-8', 'replace')
+            encoded_cmd.append(arg)
+        p = subprocess.Popen(encoded_cmd, stdin=subprocess.PIPE,
+                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if encoded_input:
+            p.stdin.write(encoded_input)
+        p.stdin.close()
+        out = p.stdout.read()
+        err = p.stderr.read()
+        failure = p.wait() != 0
+        if failure or err or out:
+            return (failure, tag.p(tag.br(), _("The command:"),
+                         tag.pre(repr(' '.join(encoded_cmd))),
+                         (_("succeeded but emitted the following output:"),
+                          _("failed with the following output:"))[failure],
+                         out and tag.pre(repr(out)),
+                         err and tag.pre(repr(err))))
+        else:
+            return (False, None)
 
     def _show_err(self, msg):
         """Display msg in an error box, using Trac style."""
