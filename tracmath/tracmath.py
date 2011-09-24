@@ -1,6 +1,4 @@
 """ TracMath - A trac plugin that renders latex formulas within a wiki page.
-
-This has currently been tested only on trac 0.10.4 and 0.11.
 """
 
 import codecs
@@ -10,6 +8,7 @@ import os.path
 
 from genshi.builder import tag
 
+from trac.config import BoolOption, IntOption, Option
 from trac.core import Component, implements
 from trac.wiki.api import IWikiMacroProvider
 from trac.wiki.api import IWikiSyntaxProvider
@@ -45,8 +44,30 @@ reLABEL = re.compile(r'\\label\{(.*?)\}')
 class TracMathPlugin(Component):
     implements(IWikiMacroProvider, IHTMLPreviewRenderer, IRequestHandler, IWikiSyntaxProvider)
 
-    def __init__(self):
-        self._load_config()
+    cache_dir_option = Option("tracmath", "cache_dir", "tmcache",
+            """The directory that will be used to cache the generated images.
+            If not given as an absolute path, the path will be relative to
+            the Trac environment's directory.
+            """)
+    
+    max_png = IntOption("tracmath", "max_png", 500,
+            """The maximum number of files that the cache should
+            contain.""")
+    
+    mag_factor = IntOption("tracmath", "mag_factor", 1100,
+            """dvipng magnification factor.""")
+    
+    compression = IntOption("tracmath", "compression", 6,
+            """PNG compression level.""")
+    
+    latex_cmd = Option("tracmath", "latex_cmd", "/usr/bin/latex",
+            """Full path to the latex program (including the filename).""")
+    
+    dvipng_cmd = Option("tracmath", "dvipng_cmd", "/usr/bin/dvipng",
+            """Full path to the dvipng program (including the filename).""")
+    
+    use_dollars = BoolOption("tracmath", "use_dollars", False,
+            """Should support for dollar wiki syntax be enabled.""")
 
     # IWikiSyntaxProvider methods
     #   stolen from http://trac-hacks.org/ticket/248
@@ -89,6 +110,10 @@ class TracMathPlugin(Component):
             display math.
             """
     def expand_macro(self, formatter, name, content):
+        errmsg = self._load_config()
+        if errmsg:
+            return self._error_div(errmsg)
+
         return self._internal_render(formatter.req, name, content)
 
     # IHTMLPreviewRenderer methods
@@ -106,6 +131,10 @@ class TracMathPlugin(Component):
         return req.path_info.startswith('/tracmath')
 
     def process_request(self, req):
+        errmsg = self._load_config()
+        if errmsg:
+            return self._error_div(errmsg)
+
         pieces = [item for item in req.path_info.split('/tracmath') if item]
 
         if pieces:
@@ -199,40 +228,23 @@ class TracMathPlugin(Component):
                 os.unlink(os.path.join(self.cache_dir, stat[1]))
 
     def _load_config(self):
-        """Load the tracmath trac.ini configuration."""
+        """Preprocess the tracmath trac.ini configuration."""
 
-        # defaults
-        tmp = 'tmcache'
-        latex = '/usr/bin/latex'
-        dvipng = '/usr/bin/dvipng'
-        max_png = 500
-        mag_factor = 1200
-        compression = 6
+        self.cache_dir = self.cache_dir_option
+        if not self.cache_dir:
+            return _("The [tracmath] section is missing the cache_dir field.")
 
-        if 'tracmath' not in self.config.sections():
-            self.log.warn("The [tracmath] section is not configured in trac.ini. Using defaults.")
-
-        self.cache_dir = self.config.get('tracmath', 'cache_dir') or tmp
-        self.latex_cmd = self.config.get('tracmath', 'latex_cmd') or latex
-        self.dvipng_cmd = self.config.get('tracmath', 'dvipng_cmd') or dvipng
-        self.max_png = self.config.get('tracmath', 'max_png') or max_png
-        self.max_png = int(self.max_png)
-        self.use_dollars = self.config.get('tracmath', 'use_dollars') or "False"
-        self.use_dollars = self.use_dollars.lower() in ("true", "on", "enabled")
-        self.mag_factor = self.config.get('tracmath', 'mag_factor') or mag_factor
-        self.compression = self.config.get('tracmath', 'compression') or compression
-
-        if not os.path.exists(self.latex_cmd):
-            self.log.error('Could not find latex binary at ' + self.latex_cmd)
-        if not os.path.exists(self.dvipng_cmd):
-            self.log.error('Could not find dvipng binary at ' + self.dvipng_cmd)
         if not os.path.isabs(self.cache_dir):
             self.cache_dir = os.path.join(self.env.path, self.cache_dir)
-        if not os.path.exists(self.cache_dir):
-            os.mkdir(self.cache_dir, 0755)
 
-        #TODO: check correct values.
-        return ''
+        if not os.path.exists(self.cache_dir):
+            os.mkdir(self.cache_dir)
+
+        if not os.path.exists(self.latex_cmd):
+            return _("Could not find latex binary at %(cmd)s", cmd=self.latex_cmd)
+
+        if not os.path.exists(self.dvipng_cmd):
+            return _("Could not find dvipng binary at %(cmd)s", cmd=self.dvipng_cmd)
 
     def _show_err(self, msg):
         """Display msg in an error box, using Trac style."""
