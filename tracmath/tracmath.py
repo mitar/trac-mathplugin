@@ -134,7 +134,7 @@ class TracMathPlugin(Component):
             `$[latex formula]$` for inline math or `$$[latex formula]$$` for
             display math.
             """
-    def expand_macro(self, formatter, name, content):
+    def expand_macro(self, formatter, name, content, args=None):
         errmsg = self._load_config()
         if errmsg:
             return self._show_err(errmsg)
