@@ -9,7 +9,7 @@ import subprocess
 
 from genshi.builder import tag
 
-from trac.config import BoolOption, IntOption, Option
+from trac.config import BoolOption, IntOption, Option, ListOption
 from trac.core import Component, implements
 from trac.wiki.api import IWikiMacroProvider
 from trac.wiki.api import IWikiSyntaxProvider
@@ -85,6 +85,9 @@ class TracMathPlugin(Component):
     
     use_dollars = BoolOption("tracmath", "use_dollars", False,
             """Should support for dollar wiki syntax be enabled.""")
+
+    invalid_commands = ListOption("tracmath", "invalid_commands", INVALID_COMMANDS,
+            """Invalid commands forbidden to be used in LaTeX content (mostly for security reasons).""")
 
     def __init__(self, *args, **kwargs):
         super(TracMathPlugin, self).__init__(*args, **kwargs)
@@ -316,7 +319,7 @@ class TracMathPlugin(Component):
         # Remove escaped back-slashes
         content = content.replace('\\\\', '')
 
-        for invalid in INVALID_COMMANDS:
+        for invalid in self.invalid_commands:
             if invalid in content:
                 return 'Invalid command in LaTeX content: %s' % (invalid,)
 
