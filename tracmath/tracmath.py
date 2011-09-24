@@ -33,12 +33,12 @@ tex_preamble = r"""
 \begin{document}
 """
 
-rePNG = re.compile(r'.+png$')
+rePNG = re.compile(r'\.png$')
 reGARBAGE = [
-             re.compile(r'.+aux$'),
-             re.compile(r'.+log$'),
-             re.compile(r'.+tex$'),
-             re.compile(r'.+dvi$'),
+             re.compile(r'\.aux$'),
+             re.compile(r'\.log$'),
+             re.compile(r'\.tex$'),
+             re.compile(r'\.dvi$'),
             ]
 reLABEL = re.compile(r'\\label\{(.*?)\}')
 
@@ -128,7 +128,7 @@ class TracMathPlugin(Component):
 
         label = None
         for line in content.split("\n"):
-            m = reLABEL.match(content)
+            m = reLABEL.search(content)
             if m:
                 label = m.group(1)
 
@@ -185,9 +185,9 @@ class TracMathPlugin(Component):
         png_files = []
         for name in os.listdir(self.cache_dir):
             for ext in reGARBAGE:
-                if ext.match(name):
+                if ext.search(name):
                     os.unlink(os.path.join(self.cache_dir, name))
-            if name.endswith('.png'):
+            if rePNG.search(name):
                 png_files.append(name)
 
         if len(png_files) > self.max_png:
