@@ -33,6 +33,33 @@ reGARBAGE = [
             ]
 reLABEL = re.compile(r'\\label\{(.*?)\}')
 
+# List taken from MathTeX
+INVALID_COMMANDS = [
+    '\\newcommand',
+    '\\providecommand',
+    '\\renewcommand',
+    '\\input',
+    '\\def',
+    '\\edef',
+    '\\gdef',
+    '\\xdef',
+    '\\loop',
+    '\\csname',
+    '\\catcode',
+    '\\output',
+    '\\everycr',
+    '\\everypar',
+    '\\everymath',
+    '\\everyhbox',
+    '\\everyvbox',
+    '\\everyjob',
+    '\\openin',
+    '\\read',
+    '\\openout',
+    '\\write',
+    '^^',
+]
+
 class TracMathPlugin(Component):
     implements(IWikiMacroProvider, IHTMLPreviewRenderer, IRequestHandler, IWikiSyntaxProvider, ITemplateProvider)
 
@@ -120,6 +147,10 @@ class TracMathPlugin(Component):
         return 0
 
     def render(self, req, mimetype, content, filename=None, url=None):
+        errmsg = self._load_config()
+        if errmsg:
+            return self._show_err(errmsg)
+
         text = hasattr(content, 'read') and content.read() or content
         return self._internal_render(req, 'latex', text)
 
@@ -146,7 +177,7 @@ class TracMathPlugin(Component):
     # Internal implementation
     def _internal_render(self, req, name, content):
         if not name == 'latex':
-            return 'Unknown macro %s' % (name)
+            return self._show_err('Unknown macro %s' % (name))
 
         label = None
         for line in content.split("\n"):
@@ -160,6 +191,10 @@ class TracMathPlugin(Component):
         imgpath = os.path.join(self.cache_dir, imgname)
 
         if not os.path.exists(imgpath):
+            errmsg = self._validate(content)
+            if errmsg:
+                return self._show_err(errmsg)
+
             texname = key + '.tex'
             texpath = os.path.join(self.cache_dir, texname)
 
@@ -273,6 +308,16 @@ class TracMathPlugin(Component):
                          err and tag.pre(repr(err))))
         else:
             return (False, None)
+
+    def _validate(self, content):
+        # Remove escaped back-slashes
+        content = content.replace('\\\\', '')
+
+        for invalid in INVALID_COMMANDS:
+            if invalid in content:
+                return 'Invalid command in LaTeX content: %s' % (invalid,)
+
+        return None
 
     def _show_err(self, msg):
         """Display msg in an error box, using Trac style."""
