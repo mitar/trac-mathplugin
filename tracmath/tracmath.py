@@ -1,7 +1,6 @@
 """ TracMath - A trac plugin that renders latex formulas within a wiki page.
 """
 
-import codecs
 import re
 import os
 import os.path
@@ -16,23 +15,14 @@ from trac.wiki.api import IWikiMacroProvider
 from trac.wiki.api import IWikiSyntaxProvider
 from trac.mimeview.api import IHTMLPreviewRenderer
 from trac.web import IRequestHandler
+from trac.web.chrome import Chrome, ITemplateProvider
 from trac.util import escape
 from trac.util.text import to_unicode
-from trac.util.translation import _
+from trac.util.translation import _, deactivate, reactivate
 from trac import mimeview
 
 __author__ = 'Reza Lotun'
 __author_email__ = 'rlotun@gmail.com'
-
-tex_preamble = r"""
-\documentclass{article}
-\usepackage{amsmath}
-\usepackage{amsthm}
-\usepackage{amssymb}
-\usepackage{bm}
-\pagestyle{empty}
-\begin{document}
-"""
 
 rePNG = re.compile(r'\.png$')
 reGARBAGE = [
@@ -44,7 +34,7 @@ reGARBAGE = [
 reLABEL = re.compile(r'\\label\{(.*?)\}')
 
 class TracMathPlugin(Component):
-    implements(IWikiMacroProvider, IHTMLPreviewRenderer, IRequestHandler, IWikiSyntaxProvider)
+    implements(IWikiMacroProvider, IHTMLPreviewRenderer, IRequestHandler, IWikiSyntaxProvider, ITemplateProvider)
 
     cache_dir_option = Option("tracmath", "cache_dir", "tmcache",
             """The directory that will be used to cache the generated images.
@@ -70,6 +60,11 @@ class TracMathPlugin(Component):
     
     use_dollars = BoolOption("tracmath", "use_dollars", False,
             """Should support for dollar wiki syntax be enabled.""")
+
+    def __init__(self, *args, **kwargs):
+        super(TracMathPlugin, self).__init__(*args, **kwargs)
+        self.template = Chrome(self.env).load_template("tracmath_template.tex", method="text")
+        self.template_digest = sha1(self.template.generate(content='').render(encoding='utf-8')).digest()
 
     # IWikiSyntaxProvider methods
     #   stolen from http://trac-hacks.org/ticket/248
@@ -159,7 +154,7 @@ class TracMathPlugin(Component):
             if m:
                 label = m.group(1)
 
-        key = sha1(content.encode('utf-8')).hexdigest()
+        key = sha1(content.encode('utf-8') + self.template_digest).hexdigest()
 
         imgname = key + '.png'
         imgpath = os.path.join(self.cache_dir, imgname)
@@ -168,14 +163,17 @@ class TracMathPlugin(Component):
             texname = key + '.tex'
             texpath = os.path.join(self.cache_dir, texname)
 
+            # Don't translate tex file
+            t = deactivate()
             try:
-                f = codecs.open(texpath, encoding='utf-8', mode='w')
-                f.write(tex_preamble)
-                f.write(content)
-                f.write('\end{document}')
+                f = open(texpath, mode='w')
+                self.template.generate(content=content).render(encoding='utf-8', out=f)
                 f.close()
             except Exception, e:
+                reactivate(t)
                 return self._show_err("Problem creating tex file: %s" % (e))
+            finally:
+                reactivate(t)
 
             os.chdir(self.cache_dir)
             args = [
@@ -287,3 +285,10 @@ class TracMathPlugin(Component):
                 tag.strong(_("TracMath macro processor has detected an error. "
                              "Please fix the problem before continuing.")),
                 msg, class_="system-message")
+    
+    def get_templates_dirs(self):
+        from pkg_resources import resource_filename
+        return [resource_filename(__name__, 'templates')]
+
+    def get_htdocs_dirs(self):
+        return []

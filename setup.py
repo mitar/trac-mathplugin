@@ -1,12 +1,20 @@
-from setuptools import find_packages, setup
+from setuptools import setup
+
+VERSION = '0.4'
+PACKAGE = 'tracmath'
 
 setup(
-    name='TracMath', version='0.4',
-    maintainer="Kamil Kisiel",
-    maintainer_email="kamil@kamilkisiel.net",
-    packages=find_packages(exclude=['*.tests*']),
-    entry_points="""
-    [trac.plugins]
-    tracmath = tracmath
-    """,
+    name = 'TracMath',
+    version = VERSION,
+    maintainer = "Kamil Kisiel",
+    maintainer_email = "kamil@kamilkisiel.net",
+    packages = [PACKAGE],
+    include_package_data = True,
+    package_data = {
+        PACKAGE: ['templates/*.tex'],
+    },
+    zip_safe = False,
+    entry_points = {
+        'trac.plugins': '%s = %s' % (PACKAGE, PACKAGE),
+    },
 )
