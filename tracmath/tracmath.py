@@ -143,7 +143,7 @@ class TracMathPlugin(Component):
 
     # IHTMLPreviewRenderer methods
     def get_quality_ratio(self, mimetype):
-        if mimetype in ('text/x-tracmath',):
+        if mimetype in ('text/x-latex',):
             return 2
         return 0
 
