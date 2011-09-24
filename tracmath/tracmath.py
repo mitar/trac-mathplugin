@@ -5,9 +5,10 @@ This has currently been tested only on trac 0.10.4 and 0.11.
 
 import codecs
 import re
-from cStringIO import StringIO
 import os
 import os.path
+
+from genshi.builder import tag
 
 from trac.core import Component, implements
 from trac.wiki.api import IWikiMacroProvider
@@ -15,6 +16,8 @@ from trac.wiki.api import IWikiSyntaxProvider
 from trac.mimeview.api import IHTMLPreviewRenderer
 from trac.web import IRequestHandler
 from trac.util import escape
+from trac.util.text import to_unicode
+from trac.util.translation import _
 from trac import mimeview
 
 __author__ = 'Reza Lotun'
@@ -155,7 +158,7 @@ class TracMathPlugin(Component):
             (out, err) = latex_proc.communicate()
 
             if len(err) and len(out):
-                return self._show_err('Unable to call: %s %s %s' % (cmd, out, err))
+                return self._show_err('Unable to call: %s\n%s%s' % (cmd, out, err))
 
             cmd = str("".join([self.dvipng_cmd,
                                " -T tight -z %s " % self.compression,
@@ -166,7 +169,7 @@ class TracMathPlugin(Component):
             (out, err) = dvipng_proc.communicate()
 
             if len(err) and len(out):
-                return self._show_err('Unable to call: %s %s %s' % (cmd, out, err))
+                return self._show_err('Unable to call: %s\n%s%s' % (cmd, out, err))
 
             self._manage_cache()
         else:
@@ -233,7 +236,12 @@ class TracMathPlugin(Component):
 
     def _show_err(self, msg):
         """Display msg in an error box, using Trac style."""
+        if isinstance(msg, str):
+            msg = to_unicode(msg)
         self.log.error(msg)
-        return '<div class="system-message"><div class="message"> \
-               <strong>TracMath macro processor has detected an error.</strong><pre>%s</pre> \
-               </div></div>' % (escape(msg),)
+        if isinstance(msg, unicode):
+            msg = tag.pre(escape(msg))
+        return tag.div(
+                tag.strong(_("TracMath macro processor has detected an error. "
+                             "Please fix the problem before continuing.")),
+                msg, class_="system-message")
