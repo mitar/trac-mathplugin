@@ -96,8 +96,22 @@ class TracMathPlugin(Component):
 
     def __init__(self, *args, **kwargs):
         super(TracMathPlugin, self).__init__(*args, **kwargs)
-        self.template = Chrome(self.env).load_template("tracmath_template.tex", method="text")
-        self.template_digest = sha1(self.template.generate(content='').render(encoding='utf-8')).digest()
+        self.__template = None
+        self.__template_digest = None
+
+    def get_template(self):
+        if self.__template is None:
+            self.__template = Chrome(self.env).load_template("tracmath_template.tex", method="text")
+        return self.__template
+
+    template = property(get_template)
+
+    def get_template_digest(self):
+        if self.__template_digest is None:
+            self.__template_digest = sha1(self.template.generate(content='').render(encoding='utf-8')).digest()
+        return self.__template_digest
+
+    template_digest = property(get_template_digest)
 
     # IWikiSyntaxProvider methods
     #   stolen from http://trac-hacks.org/ticket/248
