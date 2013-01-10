@@ -18,8 +18,13 @@ from trac.web import IRequestHandler
 from trac.web.chrome import Chrome, ITemplateProvider
 from trac.util import escape
 from trac.util.text import to_unicode
-from trac.util.translation import _, deactivate, reactivate
 from trac import mimeview
+try:
+    from trac.util.translation import _, deactivate, reactivate
+except ImportError:
+    def _(s): return s
+    def deactivate(): return None
+    def reactivate(t): pass
 
 __author__ = 'Reza Lotun'
 __author_email__ = 'rlotun@gmail.com'
@@ -137,7 +142,7 @@ class TracMathPlugin(Component):
     def expand_macro(self, formatter, name, content, args=None):
         errmsg = self._load_config()
         if errmsg:
-            return self._show_err(errmsg)
+            return str(self._show_err(errmsg))
 
         return self._internal_render(formatter.req, name, content)
 
